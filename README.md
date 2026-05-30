@@ -1,48 +1,72 @@
-# ARP MitM Attack Lab
+# CDP DoS Attack Lab
 
 ![Python](https://img.shields.io/badge/Python-3.x-blue)
 ![Platform](https://img.shields.io/badge/Platform-Kali%20Linux-red)
 ![Lab](https://img.shields.io/badge/Environment-GNS3%20%7C%20IOSvL2-orange)
-![Attack](https://img.shields.io/badge/Attack-ARP%20MitM-purple)
 ![Status](https://img.shields.io/badge/Use-Controlled%20Lab-yellow)
-![Security](https://img.shields.io/badge/Topic-Network%20Security-darkgreen)
+![Security](https://img.shields.io/badge/Topic-Network%20Security-purple)
 
 ## Aviso de uso responsable
 
 Este proyecto fue desarrollado únicamente con fines educativos, académicos y de laboratorio controlado.
 
-El script debe ejecutarse solamente en redes propias, laboratorios autorizados o entornos virtuales como GNS3, EVE-NG o PNETLab. No debe utilizarse en redes públicas, empresariales o de terceros sin autorización explícita.
+El script debe ejecutarse solamente en entornos propios o autorizados, como GNS3, EVE-NG, PNETLab o laboratorios internos de pruebas.
+
+No debe utilizarse en redes públicas, empresariales o de terceros sin autorización explícita.
+
+---
+
+## Archivos del repositorio
+
+| Archivo                                                  | Descripción                                                                                                    |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| [`cdp-attack.py`](./cdp-attack.py)                       | Script principal utilizado para ejecutar el ataque CDP DoS desde Kali Linux.                                   |
+| [`mitigacion-cdp-attack.md`](./mitigacion-cdp-attack.md) | Documento técnico con la mitigación general contra ataques CDP DoS.                                            |
+| [`README.md`](./README.md)                               | Documentación principal del laboratorio, uso del script, evidencia esperada y flujo recomendado para el video. |
 
 ---
 
 ## Descripción
 
-Este laboratorio demuestra un ataque **Man-in-the-Middle mediante ARP Spoofing**, donde una máquina atacante en Kali Linux falsifica respuestas ARP para colocarse entre una víctima y su gateway.
+Este laboratorio demuestra un ataque de denegación de servicio lógico mediante el abuso del protocolo **CDP, Cisco Discovery Protocol**.
 
-ARP no valida la identidad real de los dispositivos en la red local. Por eso, un atacante puede enviar respuestas ARP falsas indicando que su dirección MAC corresponde a la IP del gateway o a la IP de la víctima. Cuando el ataque es exitoso, el tráfico entre la víctima y el router pasa por la máquina atacante.
+CDP es un protocolo de capa 2 utilizado por dispositivos Cisco para descubrir vecinos directamente conectados. Al enviar una gran cantidad de paquetes CDP falsificados hacia un switch, el dispositivo puede verse obligado a procesar anuncios maliciosos, consumir recursos de CPU y llenar su tabla de vecinos CDP con entradas falsas.
 
-Este repositorio incluye un script en Python que automatiza el envenenamiento ARP, activa el reenvío de paquetes en Kali y restaura las tablas ARP al finalizar.
+El objetivo principal del laboratorio es demostrar el impacto del ataque y aplicar una contramedida efectiva para mitigarlo.
+
+---
+
+## Base del direccionamiento IP
+
+El direccionamiento IP del laboratorio fue definido tomando como base la matrícula:
+
+```text
+20250845
+```
+
+Separando la matrícula en octetos, se obtuvo la dirección base:
+
+```text
+20.25.8.45
+```
+
+A partir de esta dirección se creó la red del laboratorio:
+
+```text
+20.25.8.0/24
+```
 
 ---
 
 ## Objetivo del laboratorio
 
-Demostrar cómo un atacante conectado a la misma red local puede realizar un ataque ARP MitM para interceptar o controlar el tráfico entre una víctima y su gateway.
+Demostrar cómo un atacante conectado a un puerto de acceso puede abusar del protocolo CDP para generar carga en un switch Cisco IOSvL2 dentro de una topología controlada.
 
 ---
 
 ## Objetivo del script
 
-El script `arp-mitm.py` permite:
-
-* Seleccionar la interfaz de red atacante.
-* Seleccionar la IP de la víctima.
-* Seleccionar la IP del gateway.
-* Resolver automáticamente las direcciones MAC.
-* Enviar respuestas ARP falsificadas de forma continua.
-* Activar IP forwarding en Kali para mantener la comunicación.
-* Restaurar las tablas ARP al detener el ataque.
-* Demostrar control del tráfico mediante captura y bloqueo selectivo.
+El script [`cdp-attack.py`](./cdp-attack.py) genera múltiples tramas CDP falsificadas y las envía por la interfaz seleccionada. Cada trama contiene valores variables para simular vecinos CDP falsos, provocando que el switch procese una gran cantidad de anuncios CDP.
 
 ---
 
@@ -51,7 +75,7 @@ El script `arp-mitm.py` permite:
 ```text
                    +----------------+
                    |      R-1       |
-                   | 192.168.58.1   |
+                   | 20.25.8.45     |
                    | Fa0/0          |
                    +-------+--------+
                            |
@@ -67,31 +91,23 @@ El script `arp-mitm.py` permite:
               +--------+        +--------+
               |                          |
         +-----+-----+              +-----+-----+
-        |   Kali    |              |   Víctima |
-        | Atacante  |              | PC/VPC    |
+        |   Kali    |              |    VPC    |
+        | 20.25.8.46|              |20.25.8.47 |
         +-----------+              +-----------+
 ```
 
 ---
 
-## Direccionamiento IP del laboratorio
+## Direccionamiento IP
 
-| Dispositivo | Rol      | Interfaz  |    Dirección IP | Descripción                   |
-| ----------- | -------- | --------- | --------------: | ----------------------------- |
-| R-1         | Gateway  | Fa0/0     | 192.168.58.1/24 | Router de la red              |
-| SW-1        | Switch   | Gi0/0     |             N/A | Conexión hacia R-1            |
-| SW-1        | Switch   | Gi0/1     |             N/A | Conexión hacia Kali           |
-| SW-1        | Switch   | Gi0/2     |             N/A | Conexión hacia la víctima     |
-| Kali        | Atacante | eth0/eth1 |        Variable | Máquina que ejecuta el ataque |
-| PC/VPC      | Víctima  | eth0      |        Variable | Equipo atacado                |
-
-Ejemplo usado durante la prueba:
-
-| Rol           |           IP |
-| ------------- | -----------: |
-| Gateway       | 192.168.58.1 |
-| Atacante Kali | 192.168.58.2 |
-| Víctima       | 192.168.58.3 |
+| Dispositivo | Interfaz |  Dirección IP | Descripción                |
+| ----------- | -------- | ------------: | -------------------------- |
+| R-1         | Fa0/0    | 20.25.8.45/24 | Gateway de la red          |
+| SW-1        | Gi0/0    |           N/A | Conexión hacia R-1         |
+| SW-1        | Gi0/1    |           N/A | Puerto hacia Kali atacante |
+| SW-1        | Gi0/2    |           N/A | Puerto hacia VPC víctima   |
+| Kali        | eth1     | 20.25.8.46/24 | Máquina atacante           |
+| VPC         | eth0     | 20.25.8.47/24 | Equipo de prueba           |
 
 ---
 
@@ -101,31 +117,75 @@ Ejemplo usado durante la prueba:
 
 * Kali Linux
 * Python 3
-* Scapy instalado
 * Permisos de superusuario
-* Conectividad directa de capa 2 con la víctima y el gateway
+* Conectividad directa de capa 2 hacia el switch
+* Interfaz conectada a la red del laboratorio
 
-### Dispositivos de red
+### Dispositivo de red
 
-* Router Cisco o dispositivo gateway
-* Switch IOSvL2, Ethernet switch o equivalente
-* Víctima en la misma red local
+* Switch Cisco IOSvL2
+* CDP habilitado en el puerto conectado al atacante
+* Laboratorio en GNS3, EVE-NG, PNETLab o entorno equivalente
 
 ---
 
-## Verificar Scapy
+## Configuración IP base del laboratorio
 
-Antes de ejecutar el script, validar que Scapy está disponible:
+### Router R-1
 
-```bash
-python3 -c "import scapy; print('Scapy instalado')"
+```cisco
+enable
+configure terminal
+
+interface fastEthernet0/0
+ip address 20.25.8.45 255.255.255.0
+no shutdown
+
+end
+write memory
 ```
 
-Si Scapy no está instalado y Kali tiene internet:
+Si el router usa `GigabitEthernet0/0`, se cambia la interfaz:
+
+```cisco
+interface gigabitEthernet0/0
+ip address 20.25.8.45 255.255.255.0
+no shutdown
+```
+
+### VPC
+
+```text
+ip 20.25.8.47/24 20.25.8.45
+```
+
+### Kali
+
+Si la interfaz del laboratorio es `eth1`:
 
 ```bash
-sudo apt update
-sudo apt install -y python3-scapy
+sudo ip addr flush dev eth1
+sudo ip addr add 20.25.8.46/24 dev eth1
+sudo ip link set eth1 up
+sudo ip route replace default via 20.25.8.45
+```
+
+---
+
+## Pruebas de conectividad
+
+Desde VPC:
+
+```text
+ping 20.25.8.45
+ping 20.25.8.46
+```
+
+Desde Kali:
+
+```bash
+ping -c 4 20.25.8.45
+ping -c 4 20.25.8.47
 ```
 
 ---
@@ -135,20 +195,20 @@ sudo apt install -y python3-scapy
 Clonar el repositorio:
 
 ```bash
-git clone https://github.com/iClexi/ARP-MITM-Attack.git
-cd ARP-MITM-Attack
+git clone https://github.com/iClexi/CDP-Attack.git
+cd CDP-Attack
 ```
 
 Dar permisos de ejecución:
 
 ```bash
-chmod +x arp-mitm.py
+chmod +x cdp-attack.py
 ```
 
-Verificar sintaxis:
+Verificar sintaxis del script:
 
 ```bash
-python3 -m py_compile arp-mitm.py
+python3 -m py_compile cdp-attack.py
 ```
 
 ---
@@ -158,525 +218,329 @@ python3 -m py_compile arp-mitm.py
 Ejecutar el script:
 
 ```bash
-sudo python3 arp-mitm.py
+sudo python3 cdp-attack.py
 ```
 
-El script solicitará:
-
-```text
-Interfaz que usará el ataque
-IP de la víctima
-IP del gateway
-```
+El script mostrará las interfaces disponibles y pedirá seleccionar la interfaz conectada al switch.
 
 Ejemplo:
 
 ```text
-Interfaz que usará el ataque: eth0
-IP de la víctima: 192.168.58.3
-IP del gateway: 192.168.58.1
+Interfaces disponibles:
+
+1. eth0 UP 192.168.202.x/24
+2. eth1 UP 20.25.8.46/24
+
+Selecciona la interfaz conectada al switch [Enter = eth0]:
+```
+
+En este laboratorio, la interfaz correcta es la que pertenece a la red:
+
+```text
+20.25.8.0/24
 ```
 
 ---
 
-## Uso directo por parámetros
+## Uso directo
 
-También puede ejecutarse sin preguntas:
-
-```bash
-sudo python3 arp-mitm.py -i eth0 -t 192.168.58.3 -g 192.168.58.1
-```
-
-Ejecutar por tiempo definido:
+Ejecutar directamente por una interfaz específica:
 
 ```bash
-sudo python3 arp-mitm.py -i eth0 -t 192.168.58.3 -g 192.168.58.1 --duration 60
-```
-
-Ejecutar sin restaurar ARP al finalizar:
-
-```bash
-sudo python3 arp-mitm.py -i eth0 -t 192.168.58.3 -g 192.168.58.1 --no-restore
-```
-
-Ejecutar sin activar IP forwarding:
-
-```bash
-sudo python3 arp-mitm.py -i eth0 -t 192.168.58.3 -g 192.168.58.1 --no-forward
+sudo python3 cdp-attack.py -i eth1 --yes
 ```
 
 ---
 
 ## Parámetros disponibles
 
-| Parámetro         | Descripción                                                       |   Valor por defecto |
-| ----------------- | ----------------------------------------------------------------- | ------------------: |
-| `-i`, `--iface`   | Interfaz atacante usada por Kali                                  | Pregunta al usuario |
-| `-t`, `--target`  | IP de la víctima                                                  | Pregunta al usuario |
-| `-g`, `--gateway` | IP del gateway                                                    | Pregunta al usuario |
-| `--interval`      | Tiempo entre rondas de envenenamiento ARP                         |              `0.15` |
-| `--burst`         | Cantidad de paquetes ARP enviados por ronda                       |                `10` |
-| `--duration`      | Duración del ataque en segundos. Si es `0`, corre indefinidamente |                 `0` |
-| `--restore-count` | Cantidad de paquetes usados para restaurar ARP                    |                `10` |
-| `--no-restore`    | No restaura las tablas ARP al finalizar                           |         Desactivado |
-| `--no-forward`    | No activa IP forwarding                                           |         Desactivado |
-| `--yes`           | Inicia sin pedir confirmación adicional                           |         Desactivado |
+| Parámetro        | Descripción                                                       |   Valor por defecto |
+| ---------------- | ----------------------------------------------------------------- | ------------------: |
+| `-i`, `--iface`  | Interfaz de red utilizada para enviar las tramas CDP              | Pregunta al usuario |
+| `--pps`          | Paquetes por segundo. Si es `0`, envía sin límite                 |                 `0` |
+| `--count`        | Cantidad total de paquetes a enviar. Si es `0`, no tiene límite   |                 `0` |
+| `--duration`     | Duración del ataque en segundos. Si es `0`, corre indefinidamente |                 `0` |
+| `--ttl`          | Tiempo de vida de los anuncios CDP                                |               `255` |
+| `--prefix`       | Prefijo usado para los vecinos CDP falsos                         |          Automático |
+| `--extra`        | Tamaño adicional agregado al campo de software CDP                |              `1450` |
+| `--pool`         | Cantidad de tramas CDP preconstruidas por worker                  |            `200000` |
+| `--workers`      | Procesos paralelos. Si es `0`, usa todos los hilos detectados     |                 `0` |
+| `--vlan`         | VLAN nativa anunciada en los paquetes CDP                         |                `58` |
+| `--payload-size` | Tamaño máximo controlado del payload                              |              `1500` |
+| `--random-src`   | Usa MAC origen aleatoria en cada trama                            |         Desactivado |
+| `--yes`          | Inicia sin pedir confirmación                                     |         Desactivado |
 
 ---
 
 ## Funcionamiento técnico
 
-El ataque se basa en enviar respuestas ARP falsificadas a dos objetivos:
+El script construye tramas CDP falsas utilizando encapsulación de capa 2 con LLC/SNAP.
 
-### Envenenamiento hacia la víctima
+Cada paquete contiene TLVs de CDP como:
 
-El script le dice a la víctima:
+* Device ID
+* Address
+* Port ID
+* Capabilities
+* Platform
+* Native VLAN
+* Duplex
+* Software Version
 
-```text
-La IP del gateway pertenece a la MAC del atacante
-```
+El campo **Device ID** cambia constantemente para provocar que el switch registre múltiples vecinos falsos. El prefijo del ataque se genera automáticamente en cada ejecución usando una marca de tiempo, lo que permite crear nuevos conjuntos de vecinos falsificados en cada prueba.
 
-Ejemplo:
-
-```text
-192.168.58.1 -> 00:0c:29:58:50:08
-```
-
-### Envenenamiento hacia el gateway
-
-El script le dice al router:
+Ejemplo de nombres generados:
 
 ```text
-La IP de la víctima pertenece a la MAC del atacante
+CDP-DOS-MICHAEL-1780001234-0-1201-88123
+CDP-DOS-MICHAEL-1780001234-1-5520-44291
+CDP-DOS-MICHAEL-1780001234-2-9311-77610
 ```
-
-Ejemplo:
-
-```text
-192.168.58.3 -> 00:0c:29:58:50:08
-```
-
-Cuando ambos lados aceptan las respuestas falsas, Kali queda en medio de la comunicación.
 
 ---
 
 ## Evidencia esperada del ataque
 
-### En la víctima
+Antes de ejecutar el ataque, el switch debe tener bajo consumo de CPU y pocos vecinos CDP.
 
-Antes del ataque, la víctima debe tener la MAC real del gateway.
-
-Durante el ataque, el gateway aparece asociado a la MAC de Kali:
-
-```text
-00:0c:29:58:50:08  192.168.58.1
-```
-
-Esto demuestra que la víctima cree que el gateway es la máquina atacante.
-
----
-
-### En el router
-
-En R1:
+Comandos de verificación inicial:
 
 ```cisco
-show arp
+enable
+terminal length 0
+clear cdp table
+clear cdp counters
+show processes cpu sorted | include CPU|CDP|IOSv e1000|UDLD|Exec|console
+show cdp traffic
+show cdp neighbors
 ```
 
-Resultado esperado:
+Durante la ejecución del script, se espera observar:
 
-```text
-Internet  192.168.58.3    0   000c.2958.5008  ARPA   FastEthernet0/0
-```
+* Aumento del uso de CPU.
+* Aumento de paquetes CDP recibidos.
+* Entradas CDP falsas generadas por Kali.
+* Consumo del proceso `CDP Protocol`.
+* Consumo del proceso `IOSv e1000`.
+* Posible lentitud en la consola del switch.
 
-Esto demuestra que el router cree que la IP de la víctima pertenece a la MAC del atacante.
-
----
-
-## Comandos de validación
-
-### En Kali
-
-Mostrar interfaces:
-
-```bash
-ip -br a
-ip -br link
-```
-
-Mostrar la MAC de Kali:
-
-```bash
-ip -br link show eth0
-```
-
-Capturar tráfico ARP e ICMP:
-
-```bash
-sudo tcpdump -i eth0 -n -e "arp or icmp"
-```
-
-Capturar tráfico relacionado con la víctima:
-
-```bash
-sudo tcpdump -i eth0 -n -e "arp or icmp or host 192.168.58.3"
-```
-
-Guardar evidencia en archivo PCAP:
-
-```bash
-sudo tcpdump -i eth0 -n -w arp_mitm_demo.pcap "arp or icmp or host 192.168.58.3"
-```
-
----
-
-### En la víctima
-
-Ver tabla ARP:
-
-```text
-show arp
-```
-
-Probar comunicación hacia el gateway:
-
-```text
-ping 192.168.58.1
-```
-
-Volver a revisar ARP:
-
-```text
-show arp
-```
-
----
-
-### En R1
-
-Ver tabla ARP:
+Comandos para validar el ataque:
 
 ```cisco
-show arp
+show processes cpu sorted | include CPU|CDP|IOSv e1000|UDLD|Exec|console
+show cdp traffic
+show cdp neighbors
+show cdp entry *
 ```
 
 ---
 
-## Demostración de control del tráfico
-
-Además de mostrar que Kali está en medio, se puede demostrar control del tráfico bloqueando ICMP entre la víctima y el gateway.
-
-### Bloquear ping de la víctima hacia el gateway
-
-En Kali:
-
-```bash
-sudo iptables -I FORWARD 1 -s 192.168.58.3 -d 192.168.58.1 -p icmp -j DROP
-```
-
-En la víctima:
+## Ejemplo de resultado esperado
 
 ```text
-ping 192.168.58.1
+CPU utilization for five seconds: 49%/0%; one minute: 22%; five minutes: 11%
+CDP Protocol              13.91%
+IOSv e1000                12.95%
+```
+
+```text
+CDP counters:
+Total packets output: 261, Input: 29322
+CDP version 2 advertisements output: 261, Input: 29322
+```
+
+```text
+Total cdp entries displayed : 11787
+```
+
+Estos resultados evidencian que el switch está procesando una gran cantidad de anuncios CDP falsificados.
+
+---
+
+## Captura con Wireshark
+
+Para validar el tráfico en Wireshark, iniciar captura en el enlace entre Kali y el switch.
+
+Filtros recomendados:
+
+```text
+cdp
+```
+
+```text
+eth.dst == 01:00:0c:cc:cc:cc
+```
+
+El destino multicast `01:00:0c:cc:cc:cc` corresponde al tráfico CDP.
+
+---
+
+## Mitigación
+
+La mitigación principal consiste en deshabilitar CDP en puertos de acceso o puertos no confiables.
+
+La documentación completa de mitigación está disponible aquí:
+
+* [`mitigacion-cdp-attack.md`](./mitigacion-cdp-attack.md)
+
+Ejemplo básico aplicado al puerto del atacante:
+
+```cisco
+configure terminal
+interface gigabitEthernet0/1
+no cdp enable
+end
+write memory
+```
+
+Luego se limpian las entradas y contadores CDP:
+
+```cisco
+clear cdp table
+clear cdp counters
+```
+
+---
+
+## Verificación de la mitigación
+
+Después de aplicar la contramedida, ejecutar nuevamente el script y validar que el switch no aprenda vecinos CDP falsos desde el puerto del atacante.
+
+Comandos de verificación:
+
+```cisco
+show cdp interface gigabitEthernet0/1
+show cdp neighbors
+show cdp traffic
+show processes cpu sorted | include CPU|CDP|IOSv e1000|UDLD|Exec|console
 ```
 
 Resultado esperado:
 
-```text
-El ping deja de responder o presenta pérdida de paquetes
-```
-
-### Ver la regla aplicada
-
-```bash
-sudo iptables -L FORWARD -n -v --line-numbers
-```
-
-### Restaurar el tráfico
-
-```bash
-sudo iptables -D FORWARD -s 192.168.58.3 -d 192.168.58.1 -p icmp -j DROP
-```
-
-Luego probar nuevamente:
-
-```text
-ping 192.168.58.1
-```
-
-Resultado esperado:
-
-```text
-El ping vuelve a responder correctamente
-```
+* La interfaz hacia Kali no debe procesar CDP.
+* No deben generarse nuevas entradas CDP falsas desde `Gi0/1`.
+* El proceso `CDP Protocol` debe reducir su consumo.
+* La tabla de vecinos CDP debe mantenerse limpia o mostrar únicamente vecinos legítimos.
 
 ---
 
 ## Flujo recomendado para el video
 
 1. Mostrar la topología en GNS3.
-2. Mostrar nombre, matrícula, fecha y hora.
-3. Mostrar la tabla ARP normal de la víctima.
-4. Mostrar la tabla ARP normal del router.
-5. Ejecutar el script desde Kali.
-6. Seleccionar interfaz, víctima y gateway.
-7. Mostrar que la víctima asocia el gateway con la MAC de Kali.
-8. Mostrar que R1 asocia la víctima con la MAC de Kali.
-9. Ejecutar `tcpdump` en Kali para mostrar tráfico pasando por el atacante.
-10. Hacer ping desde la víctima hacia el gateway.
-11. Bloquear ICMP con `iptables`.
-12. Mostrar que el ping falla.
-13. Quitar la regla de `iptables`.
-14. Mostrar que el ping vuelve.
-15. Detener el script.
-16. Mostrar restauración de tablas ARP.
-17. Aplicar contramedida en el switch.
-18. Repetir la prueba y confirmar mitigación.
+2. Mostrar nombre y matrícula.
+3. Mostrar fecha y hora del sistema.
+4. Mostrar que CDP está activo.
+5. Mostrar el estado inicial del switch.
+6. Ejecutar el script desde Kali.
+7. Mostrar aumento de CPU y entradas CDP falsas.
+8. Mostrar captura en Wireshark.
+9. Aplicar la contramedida documentada en [`mitigacion-cdp-attack.md`](./mitigacion-cdp-attack.md).
+10. Ejecutar nuevamente el script.
+11. Confirmar que la mitigación funciona.
+12. Cerrar con una conclusión técnica.
 
 ---
 
-## Contramedidas
+## Comandos útiles para grabación
 
-### 1. DHCP Snooping
-
-DHCP Snooping permite que el switch construya una tabla de asignaciones confiables entre:
-
-* Dirección IP
-* Dirección MAC
-* VLAN
-* Puerto físico
-
-Ejemplo:
-
-```cisco
-configure terminal
-ip dhcp snooping
-ip dhcp snooping vlan 58
-no ip dhcp snooping information option
-
-interface gigabitEthernet0/0
-description Hacia_R1_DHCP_Gateway
-ip dhcp snooping trust
-
-interface gigabitEthernet0/1
-description Hacia_Kali_No_Confiable
-ip dhcp snooping limit rate 10
-
-interface gigabitEthernet0/2
-description Hacia_Victima_No_Confiable
-ip dhcp snooping limit rate 10
-
-end
-write memory
-```
-
-Verificación:
-
-```cisco
-show ip dhcp snooping
-show ip dhcp snooping binding
-```
-
----
-
-### 2. Dynamic ARP Inspection
-
-Dynamic ARP Inspection valida los paquetes ARP usando la tabla creada por DHCP Snooping.
-
-Ejemplo:
-
-```cisco
-configure terminal
-ip arp inspection vlan 58
-
-interface gigabitEthernet0/0
-description Hacia_R1
-ip arp inspection trust
-
-interface gigabitEthernet0/1
-description Hacia_Kali
-no ip arp inspection trust
-
-interface gigabitEthernet0/2
-description Hacia_Victima
-no ip arp inspection trust
-
-end
-write memory
-```
-
-Verificación:
-
-```cisco
-show ip arp inspection
-show ip arp inspection statistics
-```
-
----
-
-### 3. ARP ACL para equipos con IP estática
-
-Si los equipos tienen IP estática, se puede usar una ACL ARP.
-
-Ejemplo:
-
-```cisco
-configure terminal
-arp access-list ARP-STATIC
-permit ip host 192.168.58.1 mac host cc01.0c14.0000
-permit ip host 192.168.58.3 mac host 0050.7966.6800
-
-ip arp inspection filter ARP-STATIC vlan 58
-
-end
-write memory
-```
-
-Verificación:
-
-```cisco
-show arp access-list
-show ip arp inspection
-```
-
----
-
-### 4. Port Security
-
-Port Security limita las direcciones MAC permitidas por puerto.
-
-Ejemplo:
-
-```cisco
-configure terminal
-interface gigabitEthernet0/1
-description Puerto_Kali_No_Confiable
-switchport port-security
-switchport port-security maximum 1
-switchport port-security violation restrict
-switchport port-security mac-address sticky
-
-interface gigabitEthernet0/2
-description Puerto_Victima
-switchport port-security
-switchport port-security maximum 1
-switchport port-security violation restrict
-switchport port-security mac-address sticky
-
-end
-write memory
-```
-
-Verificación:
-
-```cisco
-show port-security
-show port-security interface gigabitEthernet0/1
-show port-security address
-```
-
----
-
-## Verificación de mitigación
-
-Después de aplicar la mitigación, ejecutar nuevamente el script:
+En Kali:
 
 ```bash
-sudo python3 arp-mitm.py
+ip -br a
+sudo python3 cdp-attack.py -i eth1 --yes
 ```
 
-Revisar en el switch:
+En el switch:
 
 ```cisco
-show ip arp inspection statistics
-show ip dhcp snooping binding
-show port-security
+terminal length 0
+clear cdp table
+clear cdp counters
+show processes cpu sorted | include CPU|CDP|IOSv e1000|UDLD|Exec|console
+show cdp traffic
+show cdp neighbors
+show cdp entry *
 ```
 
-Resultado esperado:
+Mitigación básica:
 
-* El switch bloquea paquetes ARP falsificados.
-* La tabla ARP de la víctima no cambia hacia la MAC del atacante.
-* El gateway no aprende la IP de la víctima con la MAC del atacante.
-* El tráfico ICMP no puede ser controlado por Kali mediante MitM.
+```cisco
+configure terminal
+interface gigabitEthernet0/1
+no cdp enable
+end
+write memory
+clear cdp table
+clear cdp counters
+```
 
 ---
 
 ## Troubleshooting
 
-### No se resuelve la MAC de la víctima
+### El script muestra `packets=0`
 
-Verificar conectividad:
+Posibles causas:
 
-```bash
-ping -c 4 192.168.58.3
-```
+* Interfaz incorrecta.
+* Interfaz apagada.
+* Error de permisos.
+* Trama demasiado grande.
+* El enlace virtual no está activo.
 
-Verificar interfaz correcta:
+Verificar interfaces:
 
 ```bash
 ip -br a
+ip -br link
+```
+
+Levantar interfaz:
+
+```bash
+sudo ip link set eth1 up
+```
+
+Ejecutar con permisos:
+
+```bash
+sudo python3 cdp-attack.py -i eth1 --yes
 ```
 
 ---
 
-### La víctima pierde conectividad completa
+### El CPU sube y baja
 
-Confirmar que IP forwarding está activo:
+Es normal en IOSvL2. El procesamiento ocurre por ráfagas y el entorno virtual introduce variaciones.
 
-```bash
-cat /proc/sys/net/ipv4/ip_forward
-```
+La evidencia no depende únicamente del porcentaje de CPU, sino también de:
 
-Debe mostrar:
-
-```text
-1
-```
-
-Activarlo manualmente:
-
-```bash
-echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward
-```
+* Paquetes CDP recibidos.
+* Entradas CDP falsas.
+* Proceso `CDP Protocol`.
+* Proceso `IOSv e1000`.
+* Lentitud en consola.
+* Captura en Wireshark.
 
 ---
 
-### El ping no se bloquea con iptables
+### No aparecen vecinos falsos
 
-Verificar que el tráfico realmente esté pasando por Kali:
-
-```bash
-sudo tcpdump -i eth0 -n -e "icmp or arp"
-```
-
-Ver reglas activas:
-
-```bash
-sudo iptables -L FORWARD -n -v --line-numbers
-```
-
----
-
-### Restaurar manualmente si algo queda raro
-
-En Kali:
-
-```bash
-sudo iptables -F FORWARD
-```
-
-En la víctima:
-
-```text
-clear arp
-```
-
-En R1:
+Verificar que CDP esté activo:
 
 ```cisco
-clear arp-cache
+show cdp
+show cdp interface gigabitEthernet0/1
+```
+
+Activar CDP si fue deshabilitado anteriormente:
+
+```cisco
+configure terminal
+cdp run
+interface gigabitEthernet0/1
+cdp enable
+end
 ```
 
 ---
@@ -684,15 +548,14 @@ clear arp-cache
 ## Estructura recomendada del repositorio
 
 ```text
-ARP-MITM-Attack/
-├── arp-mitm.py
+CDP-Attack/
 ├── README.md
+├── cdp-attack.py
+├── mitigacion-cdp-attack.md
 ├── captures/
-│   ├── arp-before.png
-│   ├── arp-during-victim.png
-│   ├── arp-during-router.png
-│   ├── tcpdump-mitm.png
-│   ├── icmp-blocked.png
+│   ├── cpu-before.png
+│   ├── cpu-during.png
+│   ├── cdp-neighbors.png
 │   └── mitigation.png
 ├── docs/
 │   └── technical-report.md
@@ -702,52 +565,37 @@ ARP-MITM-Attack/
 
 ---
 
-## Evidencias recomendadas
-
-| Evidencia               | Descripción                                    |
-| ----------------------- | ---------------------------------------------- |
-| `arp-before.png`        | Tabla ARP antes del ataque                     |
-| `arp-during-victim.png` | Víctima asociando gateway con MAC de Kali      |
-| `arp-during-router.png` | Router asociando víctima con MAC de Kali       |
-| `tcpdump-mitm.png`      | Kali observando ARP o ICMP                     |
-| `icmp-blocked.png`      | Kali bloqueando tráfico ICMP                   |
-| `mitigation.png`        | DAI, DHCP Snooping o Port Security funcionando |
-
----
-
-## Topics sugeridos para GitHub
+## Temas sugeridos para GitHub
 
 ```text
-arp
-arp-spoofing
-mitm
-man-in-the-middle
-kali-linux
-python
-scapy
+cdp
+cisco
 gns3
 iosvl2
 network-security
 cybersecurity
-packet-crafting
+dos-attack
 lab
-ethical-hacking
+python
+packet-crafting
 ```
 
 ---
 
 ## Conclusión
 
-Este laboratorio demuestra cómo ARP puede ser abusado en una red local para posicionar una máquina atacante entre una víctima y su gateway.
+El laboratorio demuestra que CDP puede ser abusado por un atacante conectado a un puerto de acceso para generar carga innecesaria en un switch Cisco.
 
-El ataque fue validado al observar que la víctima asoció la IP del gateway con la MAC del atacante y que el router asoció la IP de la víctima con la misma MAC atacante. Además, se demostró control del tráfico mediante captura con `tcpdump` y bloqueo selectivo de ICMP con `iptables`.
+La mitigación principal contra CDP DoS es deshabilitar CDP en puertos no confiables mediante `no cdp enable`. Esta práctica permite mantener CDP únicamente en enlaces administrados y reduce la posibilidad de que equipos externos generen carga o entradas CDP falsas.
 
-La mitigación recomendada consiste en aplicar controles de capa 2 como DHCP Snooping, Dynamic ARP Inspection, ARP ACLs y Port Security en puertos no confiables.
+Para más detalles, revisar el documento de mitigación:
+
+* [`mitigacion-cdp-attack.md`](./mitigacion-cdp-attack.md)
 
 ---
 
 ## Autor
 
-**Michael / iClexi**
+**Michael Robles / iClexi**
 Laboratorio de Seguridad de Redes
-Proyecto académico de ataque y mitigación ARP MitM
+Proyecto académico de ataque y mitigación CDP DoS
